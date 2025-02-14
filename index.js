@@ -1,6 +1,6 @@
 import { ApolloServer } from '@apollo/server'
 import { startStandaloneServer } from '@apollo/server/standalone'
-import { gql } from 'apollo-server'
+import { gql, UserInputError } from 'apollo-server'
 import mongoose from 'mongoose'
 import dotenv from 'dotenv'
 import Person from './models/person.js'
@@ -102,12 +102,28 @@ const resolvers = {
   Mutation: {
     addPerson: async (root, args) => {
       const person = new Person({ ...args })
-      return person.save()
+
+      try {
+        await person.save()
+      } catch (error) {
+        throw new UserInputError(error.message, {
+          invalidArgs: args,
+        })
+      }
+      return person
     },
     editNumber: async (root, args) => {
       const person = await Person.findOne({ name: args.name })
       person.phone = args.phone
-      return person.save()
+
+      try {
+        await person.save()
+      } catch (error) {
+        throw new UserInputError(error.message, {
+          invalidArgs: args,
+        })
+      }
+      return person
     },
   },
 }
