@@ -7,6 +7,7 @@ import dotenv from 'dotenv'
 import Person from './models/person.js'
 import User from './models/user.js'
 import { GraphQLError } from 'graphql'
+import person from './models/person.js'
 
 mongoose.set('strictQuery', false)
 dotenv.config()
@@ -66,9 +67,14 @@ const typeDefs = gql`
       street: String!
       city: String!
     ): Person
+
     editNumber(name: String!, phone: String!): Person
+
     createUser(username: String!): User
+
     login(username: String!, password: String!): Token
+
+    addAsFriend(name: String!): User
   }
 `
 
@@ -96,11 +102,22 @@ const resolvers = {
     },
   },
   Mutation: {
-    addPerson: async (root, args) => {
+    addPerson: async (root, args, context) => {
       const person = new Person({ ...args })
+      const currentUser = context.currentUser
+
+      if (!currentUser) {
+        throw new AuthenticationError('not authenticated', {
+          extensions: {
+            code: 'BAT_USER_INPUT',
+          },
+        })
+      }
 
       try {
         await person.save()
+        currentUser.friends = currentUser.friends.concat(person)
+        await currentUser.save()
       } catch (error) {
         throw new UserInputError(error.message, {
           invalidArgs: args,
@@ -153,6 +170,28 @@ const resolvers = {
       }
 
       return { value: jwt.sign(userForToken, process.env.JWT_SECRET) }
+    },
+    addAsFriend: async (root, args, { currentUser }) => {
+      const isFriend = person => {
+        currentUser.friends
+          .map(f => f._id.toString())
+          .includes(person._id.toString())
+      }
+
+      if (!currentUser) {
+        throw new GraphQLError('wrong creadentials', {
+          extensions: { code: 'BAD_USER_INPUT' },
+        })
+      }
+
+      const person = await Person.findOne({ name: args.name })
+      if (!isFriend(person)) {
+        currentUser.friends = currentUser.friends.concat(person)
+      }
+
+      await currentUser.save()
+
+      return currentUser
     },
   },
 }
