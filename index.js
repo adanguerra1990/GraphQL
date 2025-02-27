@@ -1,6 +1,6 @@
 import { ApolloServer } from '@apollo/server'
 import { startStandaloneServer } from '@apollo/server/standalone'
-import { gql, UserInputError } from 'apollo-server'
+import { AuthenticationError, gql, UserInputError } from 'apollo-server'
 import jwt from 'jsonwebtoken'
 import mongoose from 'mongoose'
 import dotenv from 'dotenv'
@@ -106,12 +106,10 @@ const resolvers = {
       const person = new Person({ ...args })
       const currentUser = context.currentUser
 
+      console.log('currentUser..', currentUser)
+
       if (!currentUser) {
-        throw new AuthenticationError('not authenticated', {
-          extensions: {
-            code: 'BAT_USER_INPUT',
-          },
-        })
+        throw new AuthenticationError('not authenticated', 'BAT_USER_INPUT')
       }
 
       try {
